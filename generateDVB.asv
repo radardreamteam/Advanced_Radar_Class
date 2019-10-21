@@ -1,0 +1,43 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%       Generates a DVB-S2 Signal
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [DVBSignal, timeVector] = generateDVB(MODCOD, Type, fc,slotNumber)
+
+j = 1i;
+
+SOF = hexToBinaryVector('18D2E82');
+MODbin = dec2bin(MODCOD,5);
+
+if Type(1) == '1'
+    FECFRAME = 16200;
+else
+    FECFRAME = 64800;
+end
+
+if Type(2) == '1'
+    pilotOn = 1;
+else
+    pilotOn = 0;
+end
+
+% In this version, we just use QPSK modulation.Each symbol contains 2bits
+BitsPerSymobol = 2  %In QPSK modulation
+symbolPerSlot  = 90;
+slotLength     = BitsPerSymobol*symbolPerSlot;
+S = FECFRAME/slotLength;
+slot = cell(S,1);
+for i =1:S
+    slot{i,1} = (randi([0,1],symbolPerSlot ,1));
+end
+
+pilot = double(64,1);
+for i =1:64
+    pilot{i,1} = ;
+end
+
+
+
+
+return
