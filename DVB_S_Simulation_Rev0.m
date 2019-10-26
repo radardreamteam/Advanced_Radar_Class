@@ -34,7 +34,7 @@ directSigPower          = directPathPower_dBm;
 
 %% Choose the Direct Signal Suppression Technique
 % 1 - NLMS, 2 - Wiener, 3 - RLS, 4 - RLC, 4 - FBLMS, 5 - ECA, 6 - SCA
-whichDSIsuppression = 'FBLMS';
+whichDSIsuppression = 'Wiener';
 
 %% Create input signal
 sigNumber   = 400;
@@ -42,7 +42,7 @@ sigNumber   = 400;
 numOfFrames = 3;
 pilotOn     = 1; % insert pilot module
 maxSymbol   = 5000; % Max symbol number we generate
-integrationTime = 8e-3; % second
+integrationTime = 1e-3; % second
 BaseBandSignal  = generate_DVBS(integrationTime,3e6,samplingFreq,maxSymbol,numOfFrames,pilotOn);
 sigLength   = length(BaseBandSignal);
 dirPath     = zeros(1, sigLength + samp_offset);
@@ -95,7 +95,6 @@ xlabel('Time (\mus)')
 ylabel('Amplitude (V)')
 title('Time Domain DVB-S Single Channel Signal')
 legend('Direct Path','Indirect Path')
-savefig(f1,'.\myPlot\DVB_S_Time_Signals.fig')
 
 % Freq domain of signals
 f2 = figure('visible','off'); 
@@ -107,7 +106,6 @@ axis([0 6 -120 5]); grid
 xlabel('Frequency (MHz)')
 ylabel('Amplitude (dBm)')
 title('DVB-S Single signal Spectrum')
-saveas(f2,'.\myPlot\Signal_Spectrum','fig');
 
 
 %% Multi- Channel Implementation
@@ -159,7 +157,12 @@ switch whichDSIsuppression
             NewsurvChannelArray(:,i) = errFBLMS;
         end
     case 'ECA'
+        K = 100;
+        d =1;
+        parfor i = 1:size(survChannelArray,2)
         
+        NewsurvChannelArray(:,i) = ECA(survChannelArray(:,i)',direct_distribute(:,i)',K,d);
+        end
     case 'SCA'
         
     otherwise
@@ -177,29 +180,26 @@ end
 [X,Y] = meshgrid(ranges, freqs);
 rdmap_compansated = sum(multi_channel_rdmap,3);
 
-f3 = figure('Name','Phased array DVB-S After NLMS DSI','visible','off'); 
+f3 = figure('Name',['Phased array DVB-S After ' whichDSIsuppression ' DSI'],'visible','off'); 
 contourf(X*1e-3,Y,rdmap_compansated')
 xlabel('Range (Km)')
 ylabel('Doppler shift (Hz)')
-title('RDM After NLMS DSI Suppression')
-saveas(f3,'.\myPlot\Array_After_NLMS_DSI','fig')
+title(['RDM After ' whichDSIsuppression ' DSI Suppression'])
 
-f4 = figure('Name','Phased array DVB-S After NLMS DSI','visible','off'); 
+f4 = figure('Name',['Phased array DVB-S After ' whichDSIsuppression ' DSI'],'visible','off'); 
 mesh(X*1e-3,Y,(rdmap_compansated')); axis tight
 xlabel('Range (Km)')
 ylabel('Doppler shift (Hz)')
-title('RDM After NLMS DSI Suppression')
-saveas(f4,'.\myPlot\Array_NLMS_DSI_3D','fig')
+title(['RDM After ' whichDSIsuppression ' DSI Suppression'])
 
 % Beamformed Array ouput without Direct Path Suppression
 analogBeam = sum(survChannelArray,2);
 [rdmap, ranges, freqs] = rangedopplerfft(analogBeam,samplingFreq , 2*timeDelay*propSpeed , freqVector, NoisyrefSignal');
-f5 = figure('Name','Phased array DVB-S random after NLMS without compensation','visible','off'); 
+f5 = figure('Name',['Phased array DVB-S random after ' whichDSIsuppression ' without compensation'],'visible','off'); 
 contourf(X*1e-3,Y,rdmap')
 xlabel('Range (Km)')
 ylabel('Doppler shift (Hz)')
 title('DVB-S Beamformed No DSI-Suppression')
-saveas(f5,'.\myPlot\DVB_S_Beamformed_No_DSI','fig')
 
 %% angle estimation
 estimator = phased.MUSICEstimator2D('SensorArray',array,...
@@ -214,12 +214,39 @@ plotSpectrum(estimator); axis tight
 title('DOA MUSIC Spectrum');
 xlabel('Azimuth')
 ylabel('Elevation')
-saveas(f6,'.\myPlot\Music_Spectrum','fig');
 
 
 
 %% Bistatic parameter estimation
  [tx2tgEst,rx2tgEst] = paraExtraction(Ddiff, norm(tx2rx), theta1);
+ 
+ 
+%% Save Figures - Whether using Windows or Mac/Linux
+% 'Windows' = Windows, 'Mac' = Mac/Linux
+% Note: Need to create folder myPlot in project directory
+os = 'Windows';
+
+% For Windows
+if (strcmp(os,'Windows'))
+    
+    saveas(f1,'.\myPlot\DVB_S_Time_Signals.fig', 'fig')
+    saveas(f2,'.\myPlot\Signal_Spectrum','fig');
+    saveas(f3,['.\myPlot\Array_After_' whichDSIsuppression '_DSI'],'fig')
+    saveas(f4,['.\myPlot\Array_' whichDSIsuppression '_DSI_3D'],'fig')
+    saveas(f5,'.\myPlot\DVB_S_Beamformed_No_DSI','fig')
+    saveas(f6,'.\myPlot\Music_Spectrum','fig');
+
+% For Mac/Linux
+elseif (strcmp(os,'Mac'))
+
+    saveas(f1,'./myPlot/DVB_S_Time_Signals.fig', 'fig')
+    saveas(f2,'./myPlot/Signal_Spectrum','fig');
+    saveas(f3,['./myPlot/Array_After_' whichDSIsuppression '_DSI'],'fig')
+    saveas(f4,['./myPlot/Array_' whichDSIsuppression '_DSI_3D'],'fig')
+    saveas(f5,'./myPlot/DVB_S_Beamformed_No_DSI','fig')
+    saveas(f6,'./myPlot/Music_Spectrum','fig');
+    
+end
 
 
 

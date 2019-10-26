@@ -103,8 +103,9 @@ for frameCnt=1:numFrames
           logical(randi([0 1], dvb.NumInfoBitsPerCodeword, 1));
     
     bchEncOut = encbch(bbFrameTx);    
-    ldpcEncOut = encldpc(bchEncOut);    
-    intrlvrOut = intrlvr(ldpcEncOut);
+    ldpcEncOut = encldpc(bchEncOut);
+    %intrlvrOut = intrlvr(ldpcEncOut); %2019a
+    intrlvrOut = intrlv(ldpcEncOut,dvb.InterleaveOrder); %2019b
     
     if dvb.ModulationOrder == 4 || dvb.ModulationOrder == 8
         modOut = pskModulator(intrlvrOut);
