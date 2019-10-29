@@ -201,6 +201,9 @@ xlabel('Range (Km)')
 ylabel('Doppler shift (Hz)')
 title('DVB-S Beamformed No DSI-Suppression')
 
+%save the variables I need for 2D CFAR
+save('myData/CFAR_files','X','Y','rdmap_compansated');
+
 %% angle estimation
 estimator = phased.MUSICEstimator2D('SensorArray',array,...
     'OperatingFrequency',txSat(1).freq,...
