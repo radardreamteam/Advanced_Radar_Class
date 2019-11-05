@@ -133,7 +133,7 @@ tic
 switch whichDSIsuppression
     case 'NLMS'
         parfor i = 1:size(survChannelArray,2)
-            filterOrder = 32;
+            filterOrder = 768;
             nlms = dsp.LMSFilter('Length',filterOrder,'Method','Normalized LMS','StepSizeSource','Input port');
             nlms.reset();
             [outputNLMS,errNLMS,weightsNLMS] = nlms(direct_distribute(:,i),survChannelArray(:,i),0.001);
@@ -150,7 +150,7 @@ switch whichDSIsuppression
     case 'RLC'
         
     case 'FBLMS'
-        filterLength = 32;
+        filterLength = 1024;
         [numRow,numCol] = size(survChannelArray);
         remData = mod(numRow,filterLength);
         truncatedData = survChannelArray(1:(numRow - remData),:);

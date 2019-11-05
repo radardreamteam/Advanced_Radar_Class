@@ -105,7 +105,7 @@ for frameCnt=1:numFrames
     end
     % Define pilot block
     pilot = sqrt(2)*(0.5+0.5*1i)*ones(64,1);
-    SOF = hexToBinaryVector('18D2E82');
+    SOF = [1   1   0   0   0   1   1   0   1   0   0   1   0   1   1   1   0   1   0   0   0   0   0   1   0];
     % This part is not the same as Pg31. The latter part should not be random but calculated by some formula. To be revised later  
     PLHeader = cat(1,SOF',(randi([0,1],65,1)));
     FrameOut = [];

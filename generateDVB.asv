@@ -7,7 +7,7 @@ function [DVBSignal, timeVector] = generateDVB(MODCOD, Type, fc,slotNumber)
 
 j = 1i;
 
-SOF = hexToBinaryVector('18D2E82');
+SOF = [1   1   0   0   0   1   1   0   1   0   0   1   0   1   1   1   0   1   0   0   0   0   0   1   0];
 MODbin = dec2bin(MODCOD,5);
 
 if Type(1) == '1'
