@@ -34,7 +34,7 @@ directSigPower          = directPathPower_dBm;
 
 %% Choose the Direct Signal Suppression Technique
 % 1 - NLMS, 2 - Wiener, 3 - RLS, 4 - RLC, 4 - FBLMS, 5 - ECA, 6 - SCA
-whichDSIsuppression = 'Wiener';
+whichDSIsuppression = 'FBLMS';
 
 %% Create input signal
 sigNumber   = 400;
@@ -42,7 +42,7 @@ sigNumber   = 400;
 numOfFrames = 3;
 pilotOn     = 1; % insert pilot module
 maxSymbol   = 5000; % Max symbol number we generate
-integrationTime = 1e-3; % second
+integrationTime = 0.0025; % second
 BaseBandSignal  = generate_DVBS(integrationTime,3e6,samplingFreq,maxSymbol,numOfFrames,pilotOn);
 sigLength   = length(BaseBandSignal);
 dirPath     = zeros(1, sigLength + samp_offset);
@@ -128,12 +128,13 @@ survChannelArray  = survChannelArray + noiseArray ;
 direct_distribute = collectPlaneWave(array,directSignal',doa2,samplingFreq);
 noiseArray        = sqrt(10^(noisePower_dBm/10))*(randn(length(tempDir),625)+j*randn(length(tempDir),625));
 direct_distribute = direct_distribute + noiseArray;
-NewsurvChannelArray = zeros(size(survChannelArray,1),size(survChannelArray,2));
+% NewsurvChannelArray = zeros(size(survChannelArray,1),size(survChannelArray,2));
+tic
 switch whichDSIsuppression
     case 'NLMS'
         parfor i = 1:size(survChannelArray,2)
             filterOrder = 32;
-            nlms = dsp.LMSFilter(filterOrder,'Method','Normalized LMS','StepSizeSource','Input port');
+            nlms = dsp.LMSFilter('Length',filterOrder,'Method','Normalized LMS','StepSizeSource','Input port');
             nlms.reset();
             [outputNLMS,errNLMS,weightsNLMS] = nlms(direct_distribute(:,i),survChannelArray(:,i),0.001);
             NewsurvChannelArray(:,i) = errNLMS;
@@ -141,7 +142,7 @@ switch whichDSIsuppression
     case 'Wiener'
         parfor i = 1:size(survChannelArray,2)
             filterOrder = 32;
-            [outputW ,errW] = wienerf(filterOrder-1,direct_distribute(:,i),survChannelArray(:,i));
+            [outputW ,errW] = wienerf(filterOrder,direct_distribute(:,i),survChannelArray(:,i));
             NewsurvChannelArray(:,i) = errW;
         end
     case 'RLS'
@@ -149,11 +150,14 @@ switch whichDSIsuppression
     case 'RLC'
         
     case 'FBLMS'
-        %Change the 'BlockLength' parameter to interger divisible of the filter inputs
-        parfor i = 1:size(survChannelArray,2)
-            filterOrder = 32;
-            fdaf = dsp.FrequencyDomainAdaptiveFilter(filterOrder,'BlockLength',31,'StepSize',0.001);
-            [outputFBLMS,errFBLMS] = fdaf(direct_distribute(:,i),survChannelArray(:,i));
+        filterLength = 32;
+        [numRow,numCol] = size(survChannelArray);
+        remData = mod(numRow,filterLength);
+        truncatedData = survChannelArray(1:(numRow - remData),:);
+        directDistData = direct_distribute(1:(numRow - remData),:);
+        parfor i = 1:size(truncatedData,2)            
+            fdaf = dsp.FrequencyDomainAdaptiveFilter('Length',filterLength,'BlockLength',filterLength,'StepSize',0.001);
+            [outputFBLMS,errFBLMS] = fdaf(directDistData(:,i),truncatedData(:,i));
             NewsurvChannelArray(:,i) = errFBLMS;
         end
     case 'ECA'
@@ -168,7 +172,7 @@ switch whichDSIsuppression
     otherwise
         disp('Not avalid DSI Algorithm')
 end
-
+toc
 %% Range-Doppler MAP 
 %compensate the phase shift to each element
 reference_distribute = collectPlaneWave(array,NoisyrefSignal',doa2,samplingFreq);
