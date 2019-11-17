@@ -1,0 +1,35 @@
+%%
+% by Hongyuan Chen for Radar Class
+% The filter follows the notation used in Haykin's Adaptive Filter Theory 
+%
+%%
+function [y,e] = RLSFilterIt(order,observed,ref)
+% Filter Parameters
+lambda  = 0.6;              % forgetting factor (0<\lambda<1)
+laminv  = 1/(1-lambda);
+delta   = 0.8;              % initialization parameter (in relationship with SNR)
+
+% Filter Initialization
+w       = zeros(order,1);       % filter coefficients
+P       = delta^-1*eye(order);     % inverse correlation matrix
+e       = ref*0;              % error signal
+y       = ref*0;              % output signal
+
+
+for m = order:length(ref)
+
+    % Acquire chunk of data (autocorrelation method)
+    u = observed(m:-1:m-order+1);
+    % Error signal equation
+    y(m) = w'*u; 
+    e(m) = ref(m)-y(m);    
+    % For efficiency
+    Pu = P*u;    
+    % Filter gain vector update
+    k = laminv*(Pu)/(1+laminv*u'*Pu);
+    % Inverse correlation matrix update
+    P = (P - k*u'*P)*laminv;
+    % Filter coefficients adaption
+    w = w + k*conj(e(m));
+
+end

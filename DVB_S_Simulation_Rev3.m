@@ -29,7 +29,7 @@ survAntGain             = 32; %40;
 %% System Parameters
 SystemParameters;
 % Update System parameters
-echoSigPower            = tgtPower_dBm(1);
+echoSigPower            = tgtPower_dBm;
 directSigPower          = directPathPower_dBm;
 
 %% Choose the Direct Signal Suppression Technique
@@ -38,35 +38,42 @@ whichDSIsuppression = 'Wiener';
 
 %% Create input signal
 sigNumber   = 400;
-
 numOfFrames = 3;
 pilotOn     = 1; % insert pilot module
 maxSymbol   = 5000; % Max symbol number we generate
-integrationTime = 0.01; % second
+integrationTime = 10e-3; % second
 BaseBandSignal  = generate_DVBS(integrationTime,3e6,samplingFreq,maxSymbol,numOfFrames,pilotOn);
 sigLength   = length(BaseBandSignal);
-dirPath     = zeros(1, sigLength + samp_offset);
-indirPath   = zeros(1, sigLength + samp_offset);
-tempEcho    = zeros(1, sigLength + samp_offset);
-tempDir     =  zeros(1, sigLength + samp_offset );
-sig         = zeros(1, sampsPerCycle*cyclesPerSymbol*400+samp_offset );
+dirPath     = zeros(1, sigLength + max(samp_offset));
+indirPath   = zeros(1, sigLength + max(samp_offset));
+tempEcho    = zeros(1, sigLength + max(samp_offset));
+tempDir     = zeros(1, sigLength + max(samp_offset) );
+sig         = zeros(1, sampsPerCycle*cyclesPerSymbol*400+max(samp_offset) );
 taxis       = (0:(length(dirPath)-1))/samplingFreq;
+Echo        = cell(1,3);
+for kk = 1:numTargets
+    Echo{kk} = zeros(1,sigLength + max(samp_offset));
+end
 
 %% Time domain signal
 dirPath(1:sigLength) = BaseBandSignal;
-indirPath(samp_offset+1:end)       = dirPath(1:sigLength)*exp(j*phaseOffset).*exp(j*2*pi*FShift*taxis(1:sigLength));
-tempEcho(samp_offset+1:end)        = indirPath(samp_offset+1:end); 
-
+for k3 = 1:numTargets
+    Echo{k3}(samp_offset(k3)+1:samp_offset(k3)+sigLength) = ...
+        dirPath(1:sigLength)*exp(j*phaseOffset).*exp(j*2*pi*FShift(k3)*taxis(1:sigLength));
+end
+echoSigPower                       = echoSigPower + survAntGain;
+for k0 = 1:numTargets
+    indirPath(k0,:)  = sqrt(10^(echoSigPower(k0)/ 10))*Echo{k0};
+end
 %The direct signal from the Tx should arrive at both Rx at the same time,
 %there is no shift.
 tempDir                            = dirPath;
 %make the reference signal
 refSignal                          = sqrt(10^((directSigPower+refGain)/10))*tempDir;
 %Create surveillance channel
-echoSigPower                       = echoSigPower + survAntGain;
-echoSignal                         = sqrt(10^(echoSigPower/10))*tempEcho;
+echoSignal                         = indirPath;
 directSignal                       = 10^(dirPathAttenuation/10)*10^(directSigPower/10)*tempDir;
-survChannel                        = echoSignal + directSignal ;
+survChannel                        = sum(echoSignal) + directSignal ;
 
 %% Add noise to the Surveillance and Reference Channels
 % Create Noise 
@@ -99,9 +106,7 @@ legend('Direct Path','Indirect Path')
 % Freq domain of signals
 f2 = figure('visible','off'); 
 indFreqSide = find((faxis_sig >= 0),1);
-
 hold on; plot(faxis_sig(indFreqSide:end)*1e-6, 20*log10(dirPath_fft(indFreqSide:end)));
-
 axis([0 6 -120 5]); grid
 xlabel('Frequency (MHz)')
 ylabel('Amplitude (dBm)')
@@ -114,35 +119,38 @@ title('DVB-S Single signal Spectrum')
 array = phased.URA('Size',[25 25],'ElementSpacing',[lamda/2 lamda/2]);
 array.Element.FrequencyRange = [500.0e6 5000.0e6];
 % Target's angle
-doa1 = [10;10];
+doaT1 = [10;10];
+doaT2 = [10;10];
+doaT3 = [10;10];
 % Given the direct signal in the surveillance channel is not helping, we
 % want to place it as far away possible in the sidelobes.
-doa2 = [80; -80]; %[30;-20];
-survChannelArray  = collectPlaneWave(array,[echoSignal',directSignal'],[doa1,doa2],txSat(1).freq); %samplingFreq);
+doaTx = [80; -80]; %[30;-20];
+survChannelArray  = collectPlaneWave(array,[echoSignal(1,:)',echoSignal(2,:)',echoSignal(3,:)',directSignal'],...
+   [doaT1,doaT2,doaT3,doaTx],txSat(1).freq); %samplingFreq);
+
 noiseArray        = sqrt(10^((noisePower_dBm)/10))*(randn(length(tempDir),625)+j*randn(length(tempDir),625));
 survChannelArray  = survChannelArray + noiseArray ;
 
 %% DIRECT SIGNAL SUPPRESSION
 % NLMS Implementation on Multi-Channel
 % We must assume we know the doa of the direct path signal
-direct_distribute = collectPlaneWave(array,directSignal',doa2,samplingFreq);
+direct_distribute = collectPlaneWave(array,directSignal',doaTx,samplingFreq);
 noiseArray        = sqrt(10^(noisePower_dBm/10))*(randn(length(tempDir),625)+j*randn(length(tempDir),625));
 direct_distribute = direct_distribute + noiseArray;
-% NewsurvChannelArray = zeros(size(survChannelArray,1),size(survChannelArray,2));
-tic
+NewsurvChannelArray = zeros(size(survChannelArray,1),size(survChannelArray,2));
 switch whichDSIsuppression
     case 'NLMS'
         parfor i = 1:size(survChannelArray,2)
-            filterLength = 32;
-            nlms = dsp.LMSFilter('Length',filterLength,'Method','Normalized LMS','StepSizeSource','Input port');
+            filterOrder = 32;
+            nlms = dsp.LMSFilter(filterOrder,'Method','Normalized LMS','StepSizeSource','Input port');
             nlms.reset();
             [outputNLMS,errNLMS,weightsNLMS] = nlms(direct_distribute(:,i),survChannelArray(:,i),0.001);
             NewsurvChannelArray(:,i) = errNLMS;
         end
     case 'Wiener'
         parfor i = 1:size(survChannelArray,2)
-            filterLength = 32;
-            [outputW ,errW] = wienerf(filterLength,direct_distribute(:,i),survChannelArray(:,i));
+            filterOrder = 32;
+            [outputW ,errW] = wienerf(filterOrder-1,direct_distribute(:,i),survChannelArray(:,i));
             NewsurvChannelArray(:,i) = errW;
         end
     case 'RLS'
@@ -150,11 +158,14 @@ switch whichDSIsuppression
     case 'RLC'
         
     case 'FBLMS'
-        filterLength = 32;
+        filterLength = 768;
+        %truncate some data to make blocklength a factor of number of data
         [numRow,numCol] = size(survChannelArray);
         remData = mod(numRow,filterLength);
         truncatedData = survChannelArray(1:(numRow - remData),:);
         directDistData = direct_distribute(1:(numRow - remData),:);
+        %accommodate NewsurvChannelArray pre-allocation to above
+        NewsurvChannelArray = zeros(size(truncatedData,1),size(truncatedData,2));
         parfor i = 1:size(truncatedData,2)            
             fdaf = dsp.FrequencyDomainAdaptiveFilter('Length',filterLength,'BlockLength',filterLength,'StepSize',0.001);
             [outputFBLMS,errFBLMS] = fdaf(directDistData(:,i),truncatedData(:,i));
@@ -172,13 +183,14 @@ switch whichDSIsuppression
     otherwise
         disp('Not avalid DSI Algorithm')
 end
-toc
+
 %% Range-Doppler MAP 
 %compensate the phase shift to each element
-reference_distribute = collectPlaneWave(array,NoisyrefSignal',doa2,samplingFreq);
+reference_distribute = collectPlaneWave(array,NoisyrefSignal',[0; 0],samplingFreq);
 % multi_channel_rdmap = zeros(size(rdmap,1),size(rdmap,2),size(reference_distribute,2));
 for i = size(reference_distribute,2)
-    [rdmap, ranges, freqs] = rangedopplerfft(NewsurvChannelArray(:,i),samplingFreq , 2*timeDelay*propSpeed , freqVector, reference_distribute(:,i));
+    [rdmap, ranges, freqs] = rangedopplerfft(NewsurvChannelArray(:,i),samplingFreq ,...
+        1.3*max(timeDelay)*propSpeed , freqVector, reference_distribute(:,i));
     multi_channel_rdmap(:,:,i) = rdmap;
 end
 [X,Y] = meshgrid(ranges, freqs);
@@ -198,7 +210,7 @@ title(['RDM After ' whichDSIsuppression ' DSI Suppression'])
 
 % Beamformed Array ouput without Direct Path Suppression
 analogBeam = sum(survChannelArray,2);
-[rdmap, ranges, freqs] = rangedopplerfft(analogBeam,samplingFreq , 2*timeDelay*propSpeed , freqVector, NoisyrefSignal');
+[rdmap, ranges, freqs] = rangedopplerfft(analogBeam,samplingFreq , 1.3*max(timeDelay)*propSpeed , freqVector, NoisyrefSignal');
 f5 = figure('Name',['Phased array DVB-S random after ' whichDSIsuppression ' without compensation'],'visible','off'); 
 contourf(X*1e-3,Y,rdmap')
 xlabel('Range (Km)')
@@ -225,7 +237,8 @@ ylabel('Elevation')
 
 
 %% Bistatic parameter estimation
- [tx2tgEst,rx2tgEst] = paraExtraction(Ddiff, norm(tx2rx), theta1);
+% need fix SystemParameters about theta1
+% [tx2tgEst,rx2tgEst] = paraExtraction(Ddiff, norm(tx2rx), theta1);
  
  
 %% Save Figures - Whether using Windows or Mac/Linux

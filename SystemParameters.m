@@ -13,6 +13,7 @@ lamda              = propSpeed/txSat(1).freq;
 txSat(1).lambda    = propSpeed/txSat(1).freq;
 txSat(2).erp_dBm   = 58.45 + 30; %dBW to dBm
 txSat(2).freq      = 2333.405e6;
+
 txSat(2).lambda    = propSpeed/txSat(2).freq;
 % Receiver Information
 rx.pos_lla      = [39.329956, -76.620485, 1552];
@@ -35,12 +36,22 @@ Loss            = 6; %loss budget
 tgt(1).pos_lla     = [39.366666, -76.743338, 15000];
 tgt(1).pos_ecef    = lla2ecef(tgt(1).pos_lla);
 tgt(1).vel_ecef     = [0,50 ,0];
+
+tgt(2).pos_lla     = [39.366666, -76.443338, 15000];
+tgt(2).pos_ecef    = lla2ecef(tgt(2).pos_lla);
+tgt(2).vel_ecef    = [0,20 ,0];
+
+tgt(3).pos_lla     = [39.366666, -77.043338, 15000];
+tgt(3).pos_ecef    = lla2ecef(tgt(3).pos_lla);
+tgt(3).vel_ecef    = [30,0 ,0];
 % Target Radar Cross Section
 tgt(1).rcs_dBsm    = 25;
+tgt(2).rcs_dBsm    = 35;
+tgt(3).rcs_dBsm    = 30;
 
 %% Calculate direct-path antenna U/V coordinates
 % Get transform from ecef to ENU at antenna position
-numTargets = 1;
+numTargets = 3;
 for k0 = 1:numTargets
     targetENU                              = zeros(3,1);
     [targetENU(1), targetENU(2), targetENU(3)] = ecef2enu(tgt(k0).pos_ecef(1), ...
@@ -82,11 +93,13 @@ vDirectPath        = uDirectPathAnt(3);
 %% Signal and Noise Power
 %Target signal power
 for k1 = 1:numTargets
-    tx2tgtRange(k1) = norm(txSat(k1).pos_ecef - tgt(k1).pos_ecef);
+    tgt2tx{k1} = tgt(k1).pos_ecef-txSat(1).pos_ecef  ;
+    tgt2rx{k1} = tgt(k1).pos_ecef-rx_ref.pos_ecef ;
+    tx2tgtRange(k1) = norm(txSat(1).pos_ecef - tgt(k1).pos_ecef);
     rx2tgtRange(k1) = norm(rx.pos_ecef - tgt(k1).pos_ecef);
     rxGain_dB       = 32; %Rx beamformed gain
     %recieved Signal power
-    tgtPower_dBm(k1)    = txSat(k1).erp_dBm + 20*log10(txSat(k1).lambda^2) + ...
+    tgtPower_dBm(k1)    = txSat(1).erp_dBm + 20*log10(txSat(1).lambda^2) + ...
         tgt(k1).rcs_dBsm - 30*log10(4*pi) - 20*log10(tx2tgtRange(k1)) - ...
         20*log10(rx2tgtRange(k1)) + rxGain_dB - Loss;
 end
@@ -115,13 +128,14 @@ sampsPerCycle   = 10;
 % modulation rate must be less than 10% RF freq to be narrowband
 cyclesPerSymbol = 16; % was 16
 %% Calculate doppler shift
-tgtVel = tgt(1).vel_ecef;
-tgt2tx = tgt(1).pos_ecef-txSat(1).pos_ecef  ;
-tgt2rx = tgt(1).pos_ecef-rx_ref.pos_ecef  ;
 tx2rx  = txSat(1).pos_ecef - rx_ref.pos_ecef; %known parameter
-dopplerTx = dot(tgtVel,tgt2tx)/norm(tgt2tx);
-dopplerRx = dot(tgtVel,tgt2rx)/norm(tgt2rx);
-FShift = dopplerTx + dopplerRx;
-FShift = FShift*txSat(1).freq  /propSpeed;
-
-theta1 = acos(dot(tx2rx,tgt2rx)/(norm(tx2rx)*norm(tgt2rx)));% the angle used in parameter extraction
+for k2 = 1:numTargets
+    tgtVel = tgt(k2).vel_ecef;
+    tgt2tx{k2} = tgt(k2).pos_ecef-txSat(1).pos_ecef  ;
+    tgt2rx{k2} = tgt(k2).pos_ecef-rx_ref.pos_ecef  ;
+    dopplerTx(k2) = dot(tgtVel,tgt2tx{k2})/norm(tgt2tx{k2});
+    dopplerRx(k2) = dot(tgtVel,tgt2rx{k2})/norm(tgt2rx{k2});
+    FShift(k2) = dopplerTx(k2) + dopplerRx(k2);
+    FShift(k2) = FShift(k2)*txSat(1).freq  /propSpeed;
+end
+%theta1 = acos(dot(tx2rx,tgt2rx)/(norm(tx2rx)*norm(tgt2rx)));% the angle used in parameter extraction
