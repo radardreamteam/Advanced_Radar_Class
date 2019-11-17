@@ -3,11 +3,11 @@
 % The filter follows the notation used in Haykin's Adaptive Filter Theory 
 %
 %%
-function [y,e] = RLSFilterIt(order,observed,ref)
+function [y,e] = RLSFilter(order,observed,ref,lambda,delta)
 % Filter Parameters
-lambda  = 0.6;              % forgetting factor (0<\lambda<1)
+%lambda  = 0.6;              % forgetting factor (0<\lambda<1)
 laminv  = 1/(1-lambda);
-delta   = 0.8;              % initialization parameter (in relationship with SNR)
+%delta   = 0.8;              % initialization parameter (in relationship with SNR)
 
 % Filter Initialization
 w       = zeros(order,1);       % filter coefficients
