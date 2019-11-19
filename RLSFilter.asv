@@ -26,7 +26,7 @@ for m = order:length(ref)
     % For efficiency
     Pu = laminv*P*u;    
     % Filter gain vector update
-    k = Pu/(1+u'*Pu);
+    k = Pu)/(1+laminv*u'*Pu);
     % Inverse correlation matrix update
     P = (P - k*u'*P)*laminv;
     % Filter coefficients adaption

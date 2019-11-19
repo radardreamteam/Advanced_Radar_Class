@@ -34,14 +34,14 @@ directSigPower          = directPathPower_dBm;
 
 %% Choose the Direct Signal Suppression Technique
 % 1 - NLMS, 2 - Wiener, 3 - RLS, 4 - RLC, 4 - FBLMS, 5 - ECA, 6 - SCA
-whichDSIsuppression = 'Wiener';
+whichDSIsuppression = 'RLS';
 
 %% Create input signal
 sigNumber   = 400;
 numOfFrames = 3;
 pilotOn     = 1; % insert pilot module
 maxSymbol   = 5000; % Max symbol number we generate
-integrationTime = 10e-3; % second
+integrationTime = 6e-3; % second
 BaseBandSignal  = generate_DVBS(integrationTime,3e6,samplingFreq,maxSymbol,numOfFrames,pilotOn);
 sigLength   = length(BaseBandSignal);
 dirPath     = zeros(1, sigLength + max(samp_offset));
@@ -150,11 +150,16 @@ switch whichDSIsuppression
     case 'Wiener'
         parfor i = 1:size(survChannelArray,2)
             filterOrder = 32;
-            [outputW ,errW] = wienerf(filterOrder-1,direct_distribute(:,i),survChannelArray(:,i));
+            [outputW ,errW] = wienerf(filterOrder,direct_distribute(:,i),survChannelArray(:,i));
             NewsurvChannelArray(:,i) = errW;
         end
     case 'RLS'
-        
+        parfor i = 1:size(survChannelArray,2)
+            filterOrder = 32;
+            %RLSFilter(order,observed,ref,'Forgetting Factor','Initialization Parameter')
+            [outputRLS,errRLS] = RLSFilter(filterOrder,direct_distribute(:,i),survChannelArray(:,i),0.98,1);
+            NewsurvChannelArray(:,i) = errRLS;
+        end
     case 'RLC'
         
     case 'FBLMS'
