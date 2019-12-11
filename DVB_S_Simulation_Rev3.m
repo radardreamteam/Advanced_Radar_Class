@@ -34,14 +34,14 @@ directSigPower          = directPathPower_dBm;
 
 %% Choose the Direct Signal Suppression Technique
 % 1 - NLMS, 2 - Wiener, 3 - RLS, 4 - RLC, 4 - FBLMS, 5 - ECA, 6 - SCA
-whichDSIsuppression = 'RLS';
+whichDSIsuppression = 'FBLMS';
 
 %% Create input signal
 sigNumber   = 400;
 numOfFrames = 3;
 pilotOn     = 1; % insert pilot module
 maxSymbol   = 5000; % Max symbol number we generate
-integrationTime = 6e-3; % second
+integrationTime = 5e-3; % second
 BaseBandSignal  = generate_DVBS(integrationTime,3e6,samplingFreq,maxSymbol,numOfFrames,pilotOn);
 sigLength   = length(BaseBandSignal);
 dirPath     = zeros(1, sigLength + max(samp_offset));
