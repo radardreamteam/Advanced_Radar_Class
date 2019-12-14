@@ -45,7 +45,7 @@ clutterSig_Doa     = [70 79 69 ;51 43 61];
 whichCancellation   = 'element';
 % Choose the Direct Signal Suppression Technique
 % 1 - NLMS, 2 - Wiener, 3 - RLS, 4 - FBLMS, 5 - ECA, 6 - SCA, 7 - CLEAN
-whichDSIsuppression = 'FBLMS';
+whichDSIsuppression = 'ECA';
 % Choose a sub-cancellation algorithm for CLEAN
 sub_algorithm       = 'RLS';
 
@@ -233,7 +233,7 @@ switch whichDSIsuppression
           DSIed = errRLS;
         end
     case 'FBLMS'
-        filterLength = 512;
+        filterLength = 32;
         if (elementCancellation == 1)
             %truncate some data to make blocklength a factor of number of data
             [numRow,numCol] = size(survChannelArray);
@@ -255,7 +255,7 @@ switch whichDSIsuppression
             remData = mod(numRow,filterLength);
             truncatedData = BeamformedSurv(1:(numRow - remData));            
             directDistData = direct_ref(1:(numRow - remData));
-            fdaf = dsp.FrequencyDomainAdaptiveFilter('Length',filterLength,'BlockLength',filterLength,'StepSize',1);
+            fdaf = dsp.FrequencyDomainAdaptiveFilter('Length',filterLength,'BlockLength',filterLength,'StepSize',0.001);
             fdaf.reset()
             [outputFBLMS,errFBLMS] = fdaf(directDistData.',truncatedData);
             fftCoeffs = fdaf.FFTCoefficients;
@@ -351,13 +351,13 @@ end
 [X,Y] = meshgrid(ranges, freqs);
 
 
-f3 = figure('Name',['Phased array DVB-S After ' whichDSIsuppression ' DSI'],'visible','off'); 
+f3 = figure('Name',['Phased array DVB-S After ' whichDSIsuppression ' DSI'],'visible','on'); 
 contourf(X*1e-3,Y,rdmap_compansated')
 xlabel('Range (Km)')
 ylabel('Doppler shift (Hz)')
 title(['RDM After ' whichDSIsuppression ' DSI Suppression'])
 
-f4 = figure('Name',['Phased array DVB-S After ' whichDSIsuppression ' DSI'],'visible','off'); 
+f4 = figure('Name',['Phased array DVB-S After ' whichDSIsuppression ' DSI'],'visible','on'); 
 mesh(X*1e-3,Y,(rdmap_compansated')); axis tight
 xlabel('Range (Km)')
 ylabel('Doppler shift (Hz)')
@@ -371,7 +371,7 @@ switch whichCancellation
     case 'beamform'
         [rdmap, ranges, freqs] = rangedopplerfft(BeamformedSurv,samplingFreq, 2*max(timeDelay)*propSpeed, freqVector, direct_ref.');
 end
-f5 = figure('Name',['Phased array DVB-S random after ' whichDSIsuppression ' without compensation'],'visible','off'); 
+f5 = figure('Name',['Phased array DVB-S random after ' whichDSIsuppression ' without compensation'],'visible','on'); 
 contourf(X*1e-3,Y,rdmap')
 xlabel('Range (Km)')
 ylabel('Doppler shift (Hz)')
