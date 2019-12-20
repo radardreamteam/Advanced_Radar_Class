@@ -1,24 +1,46 @@
 %% 2D CFAR
 tic;
 close all; clear all;
-load('myData/CFAR_files');
+%load('myData/new/CFAR_files');
 
-plotFigures();
+%plotFigures();
+%Dimitri plotter function dimension reduces the cfar data
+dimitri_plotter();
 %create the cfar object
-cfar2D = phased.CFARDetector2D('Method','CA','GuardBandSize',10,'TrainingBandSize',80,'ProbabilityFalseAlarm',8e-3);
+%if you would like to test against Matlabs version
+%cfar2D = phased.CFARDetector2D('Method','GOCA','GuardBandSize',4,'TrainingBandSize',...
+ %   12,'ProbabilityFalseAlarm',1e-5,'ThresholdOutputPort',true);
+ 
+ % Always Specify GOCA even though it will be VI-CFAR
+cfar2D = CFARDetector2D_dimitri('Method','GOCA','GuardBandSize',4,'TrainingBandSize',...
+    12,'ProbabilityFalseAlarm',1e-6,'ThresholdOutputPort',true);
 
-
-%% My works but doesn't detect anything
+%% prepare grids for use with matlab adjusted CFAR algorithms
 %sub in my own values do this later
-resp=rdmap_compansated;
-rngGrid=X*1e-3;
-rngGrid=rngGrid(1,:)';
-dopGrid=flipud(Y);
-dopGrid=dopGrid(:,1);
+reducing=true;
+if reducing% reduction
+    resp=rdmap_reduced;
+    rngGrid=X_reduced*1e-3;%scale range grid
+    rngGrid=rngGrid(1,:)';%grab only one dimension of the range grid
+    dopGrid=flipud(Y_reduced);%invert doppler grid to fix scaling??
+    dopGrid=dopGrid(:,1);%grab only one dimension
+    
+    [~,rangeIndx] = min(abs(rngGrid-[10 45]));
+    [~,dopplerIndx] = min(abs(dopGrid-[-300 300]));
+else
+    resp=rdmap_compansated;
+    rngGrid=X*1e-3;%scale range grid
+    rngGrid=rngGrid(1,:)';%grab only one dimension of the range grid
+    dopGrid=flipud(Y);%invert doppler grid to fix scaling??
+    dopGrid=dopGrid(:,1);%grab only one dimension
+    
+    [~,rangeIndx] = min(abs(rngGrid-[15 40]));
+    [~,dopplerIndx] = min(abs(dopGrid-[-400 400]));
+end
+
 
 %add in next step
-[~,rangeIndx] = min(abs(rngGrid-[3 15]));
-[~,dopplerIndx] = min(abs(dopGrid-[-320 300]));
+
 [columnInds,rowInds] = meshgrid(dopplerIndx(1):dopplerIndx(2),rangeIndx(1):rangeIndx(2));
 CUTIdx = [rowInds(:) columnInds(:)]';
 
@@ -26,9 +48,24 @@ CUTIdx = [rowInds(:) columnInds(:)]';
 %plots or whatever
 %this is same as calling step function
 %detections = cfar2D(resp,CUTIdx);
-[detections]=step(cfar2D,resp,CUTIdx);
-if_zero_nothing_detected=max(detections)
-helperDetectionsMap(resp,rngGrid,dopGrid,rangeIndx,dopplerIndx,detections,X,Y)
+[detections,th]=step(cfar2D,resp,CUTIdx);%take a look at the computer threshold
+%if_zero_nothing_detected=max(detections)
+
+%add in optional masking
+mask=true;
+if mask
+    %get sub sections of both thresholds and the RD map
+    
+end
+
+if reducing
+    helperDetectionsMap(resp,rngGrid,dopGrid,rangeIndx,dopplerIndx,detections,th,X_reduced,Y_reduced,CUTIdx)
+else
+    helperDetectionsMap(resp,rngGrid,dopGrid,rangeIndx,dopplerIndx,detections,th,X,Y)
+end
+%display max of threshold and dopplermap
+doppler_max=max(max(rdmap_compansated))
+thresh_max=max(max(th))
 
 %time it
 elapsed_time=toc()
